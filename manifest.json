@@ -1,0 +1,17 @@
+{
+  "name": "筋トレ記録",
+  "short_name": "筋トレ",
+  "description": "パーソナル・トレーニングログ",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f0f1a",
+  "theme_color": "#0f0f1a",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Flexed%20biceps/3D/flexed_biceps_3d.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

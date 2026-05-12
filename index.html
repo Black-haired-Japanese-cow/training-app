@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0f0f1a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>筋トレ記録</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+    html,body{height:100%;overscroll-behavior:none}
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;
+      background:#0f0f1a;color:#e0e0e0;
+      max-width:480px;margin:0 auto;
+      display:flex;flex-direction:column;
+    }
+    /* ── SCREENS ── */
+    .screen{display:none;flex-direction:column;flex:1;padding:20px;overflow-y:auto}
+    .screen.active{display:flex}
+    /* ── HEADER ── */
+    .hdr{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-shrink:0}
+    .hdr h1{font-size:1.1rem;font-weight:700}
+    .back{background:none;border:none;color:#e94560;font-size:1.4rem;cursor:pointer;line-height:1;padding:4px 8px 4px 0}
+    /* ── BUTTONS ── */
+    .btn{display:block;width:100%;padding:16px;border:none;border-radius:14px;font-size:1rem;font-weight:700;cursor:pointer;transition:opacity .15s}
+    .btn:active{opacity:.6}
+    .btn-primary{background:#e94560;color:#fff}
+    .btn-ghost{background:#1e1e3a;color:#e0e0e0}
+    .btn-outline{background:transparent;color:#e94560;border:2px solid #e94560}
+    .btn+.btn{margin-top:10px}
+    /* ── BODY PART GRID ── */
+    .bp-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .bp-card{padding:22px 10px;background:#1e1e3a;border-radius:14px;text-align:center;cursor:pointer;border:2px solid transparent;transition:border-color .15s}
+    .bp-card:active{border-color:#e94560}
+    .bp-card .icon{font-size:2rem;margin-bottom:6px}
+    .bp-card .lbl{font-size:.9rem;font-weight:700}
+    /* ── LIST ── */
+    .lst{display:flex;flex-direction:column;gap:8px}
+    .lst-item{padding:16px;background:#1e1e3a;border-radius:12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border:2px solid transparent;transition:border-color .15s}
+    .lst-item:active{border-color:#e94560}
+    .lst-cnt{font-size:.8rem;color:#666}
+    /* ── SORT ── */
+    .sort-row{display:flex;gap:8px;margin-bottom:14px;flex-shrink:0}
+    .sort-btn{flex:1;padding:9px;border:1px solid #333;border-radius:10px;background:#1e1e3a;color:#666;font-size:.85rem;cursor:pointer;transition:all .15s}
+    .sort-btn.on{background:#e94560;color:#fff;border-color:#e94560}
+    /* ── PREV RECORD ── */
+    .prev{background:#1a1a30;border-left:3px solid #e94560;border-radius:0 10px 10px 0;padding:14px 16px;margin-bottom:18px;flex-shrink:0}
+    .prev .plbl{font-size:.75rem;color:#888;margin-bottom:4px}
+    .prev .pval{font-size:1.05rem;font-weight:700}
+    /* ── INPUTS ── */
+    .inp-group{display:flex;gap:10px;margin-bottom:14px}
+    .inp-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+    .inp-lbl{font-size:.75rem;color:#888}
+    .inp{width:100%;background:#1e1e3a;border:1.5px solid #333;border-radius:12px;padding:14px 8px;color:#e0e0e0;font-size:1.3rem;text-align:center;-webkit-appearance:none;appearance:none}
+    .inp:focus{outline:none;border-color:#e94560}
+    .inp-unit{font-size:.75rem;color:#666}
+    textarea.inp{font-size:.95rem;text-align:left;resize:none;height:72px;padding:12px}
+    /* ── SESSION BAR ── */
+    .sbar{background:#1e1e3a;border-radius:10px;padding:10px 14px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;font-size:.85rem;flex-shrink:0}
+    .sbar span{color:#888}
+    /* ── SUMMARY ── */
+    .sum-item{background:#1e1e3a;border-radius:12px;padding:14px;margin-bottom:8px}
+    .sum-name{font-weight:700;margin-bottom:6px}
+    .sum-detail{font-size:.85rem;color:#aaa;line-height:1.6}
+    /* ── POPUP ── */
+    .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;align-items:flex-end}
+    .overlay.on{display:flex}
+    .popup{background:#1a1a30;border-radius:20px 20px 0 0;padding:24px;width:100%;display:flex;flex-direction:column;gap:10px}
+    .popup h3{text-align:center;margin-bottom:6px;font-size:1rem}
+    /* ── LOGIN ── */
+    .login-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;text-align:center}
+    .app-logo{font-size:3rem}
+    .app-name{font-size:1.6rem;font-weight:800;color:#e94560}
+    .app-sub{color:#888;font-size:.9rem;margin-top:4px}
+    /* ── UTIL ── */
+    .spacer{flex:1}
+    .mt8{margin-top:8px}
+    .mt16{margin-top:16px}
+    .mt20{margin-top:20px}
+    .muted{color:#888;font-size:.9rem;text-align:center}
+    .err{color:#e94560;font-size:.85rem;text-align:center;margin-top:8px}
+    .spin{text-align:center;padding:32px;color:#666}
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="s-login" class="screen active">
+  <div class="login-wrap">
+    <div>
+      <div class="app-logo">💪</div>
+      <div class="app-name">筋トレ記録</div>
+      <div class="app-sub">パーソナル・トレーニングログ</div>
+    </div>
+    <div style="width:100%">
+      <button class="btn btn-primary" onclick="signIn()">Google でサインイン</button>
+      <div id="login-err" class="err"></div>
+    </div>
+  </div>
+</div>
+
+<!-- HOME -->
+<div id="s-home" class="screen">
+  <div class="hdr"><h1>💪 筋トレ記録</h1></div>
+  <div id="home-msg" class="muted"></div>
+  <div class="spacer"></div>
+  <div class="prev-label muted mt20" style="margin-bottom:8px;text-align:left">セッションメモ（任意）</div>
+  <textarea id="session-note" class="inp" placeholder="今日のコンディションなど"></textarea>
+  <div class="mt16">
+    <button class="btn btn-primary" onclick="startSession()">セッション開始</button>
+  </div>
+</div>
+
+<!-- BODY PART -->
+<div id="s-body" class="screen">
+  <div class="hdr"><h1>部位を選択</h1></div>
+  <div id="sbar-body" class="sbar"><span id="sbar-date"></span><span id="sbar-time"></span></div>
+  <div class="bp-grid" id="bp-grid"></div>
+  <div class="spacer"></div>
+  <div class="mt16">
+    <button class="btn btn-outline" onclick="goEndConfirm()">セッション終了</button>
+  </div>
+</div>
+
+<!-- EXERCISE -->
+<div id="s-ex" class="screen">
+  <div class="hdr">
+    <button class="back" onclick="showScreen('s-body')">←</button>
+    <h1 id="ex-title">種目</h1>
+  </div>
+  <div class="sort-row">
+    <button class="sort-btn on" id="sort-name" onclick="setSort('name')">50音順</button>
+    <button class="sort-btn" id="sort-cnt" onclick="setSort('count')">実施回数順</button>
+  </div>
+  <div class="lst" id="ex-list"></div>
+</div>
+
+<!-- SET INPUT -->
+<div id="s-set" class="screen">
+  <div class="hdr">
+    <button class="back" onclick="showScreen('s-ex')">←</button>
+    <h1 id="set-title"></h1>
+  </div>
+  <div class="prev" id="prev-block">
+    <div class="plbl">前回の記録</div>
+    <div class="pval" id="prev-val">記録なし</div>
+  </div>
+  <div id="set-inputs"></div>
+  <textarea id="set-note" class="inp" placeholder="セットメモ（任意）"></textarea>
+  <div class="mt16">
+    <button class="btn btn-primary" onclick="doSaveSet()">保存</button>
+  </div>
+</div>
+
+<!-- SESSION END CONFIRM -->
+<div id="s-end" class="screen">
+  <div class="hdr">
+    <button class="back" onclick="showScreen('s-body')">←</button>
+    <h1>セッション確認</h1>
+  </div>
+  <div id="end-summary"></div>
+  <div class="spacer"></div>
+  <textarea id="end-note" class="inp" placeholder="セッションメモ（任意）"></textarea>
+  <div class="mt16">
+    <button class="btn btn-primary" onclick="doEndSession()">終了して保存</button>
+    <button class="btn btn-ghost mt8" onclick="showScreen('s-body')">トレーニングに戻る</button>
+  </div>
+</div>
+
+<!-- SAVE POPUP -->
+<div class="overlay" id="popup">
+  <div class="popup">
+    <h3>✅ 保存しました</h3>
+    <button class="btn btn-primary" onclick="popContinue()">続けて同じ種目</button>
+    <button class="btn btn-ghost" onclick="showScreen('s-ex')">別の種目へ</button>
+    <button class="btn btn-ghost" onclick="showScreen('s-body')">部位選択に戻る</button>
+  </div>
+</div>
+
+<script src="https://accounts.google.com/gsi/client" async onload="initAuth()"></script>
+<script>
+// ── CONFIG ──
+const SS_ID   = '1m9wph63HyKsq9jY6_GELqLQKuHHtQZwr2Cgzdj2XlzA';
+const CLI_ID  = '389042102534-tcngdtra3sogj8v6bhg9qv5fsmnle9g7.apps.googleusercontent.com';
+const SCOPE   = 'https://www.googleapis.com/auth/spreadsheets';
+const API     = `https://sheets.googleapis.com/v4/spreadsheets/${SS_ID}`;
+
+// ── STATE ──
+let token = null, tokenExp = 0, tokenClient = null;
+let exercises = [], exCounts = {};
+let session = null;       // { id, date, startTime }
+let selPart = null, selEx = null;
+let sortMode = 'name';
+
+// ── AUTH ──
+function initAuth() {
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLI_ID, scope: SCOPE, callback: onToken,
+  });
+  const c = JSON.parse(localStorage.getItem('gtok') || 'null');
+  if (c && Date.now() < c.exp - 60000) {
+    token = c.tok; tokenExp = c.exp; onSignedIn(); return;
+  }
+}
+
+function signIn() { tokenClient.requestAccessToken({ prompt: 'consent' }); }
+
+function onToken(r) {
+  if (r.error) { document.getElementById('login-err').textContent = 'サインイン失敗: ' + r.error; return; }
+  token = r.access_token;
+  tokenExp = Date.now() + r.expires_in * 1000;
+  localStorage.setItem('gtok', JSON.stringify({ tok: token, exp: tokenExp }));
+  onSignedIn();
+}
+
+async function ensureToken() {
+  if (Date.now() < tokenExp - 60000) return;
+  await new Promise(res => {
+    tokenClient.callback = r => {
+      token = r.access_token; tokenExp = Date.now() + r.expires_in * 1000;
+      localStorage.setItem('gtok', JSON.stringify({ tok: token, exp: tokenExp }));
+      res();
+    };
+    tokenClient.requestAccessToken({ prompt: '' });
+  });
+}
+
+// ── SHEETS API ──
+async function sGet(range) {
+  await ensureToken();
+  const r = await fetch(`${API}/values/${encodeURIComponent(range)}`,
+    { headers: { Authorization: `Bearer ${token}` } });
+  return r.json();
+}
+
+async function sAppend(range, values) {
+  await ensureToken();
+  const r = await fetch(
+    `${API}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+    { method:'POST', headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+      body: JSON.stringify({ values }) });
+  return r.json();
+}
+
+async function sPut(range, values) {
+  await ensureToken();
+  const r = await fetch(
+    `${API}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
+    { method:'PUT', headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+      body: JSON.stringify({ values }) });
+  return r.json();
+}
+
+function toObjs(d) {
+  if (!d.values || d.values.length < 2) return [];
+  const h = d.values[0];
+  return d.values.slice(1).map(r => Object.fromEntries(h.map((k,i) => [k, r[i]??''])));
+}
+
+// ── INIT ──
+async function onSignedIn() {
+  showScreen('s-home');
+  document.getElementById('home-msg').textContent = '種目データを読み込み中...';
+  try {
+    const d = await sGet('exercises!A:E');
+    exercises = toObjs(d);
+    document.getElementById('home-msg').textContent = `種目 ${exercises.length} 件 読み込み完了`;
+  } catch(e) {
+    document.getElementById('home-msg').textContent = 'データ読み込みエラー';
+  }
+}
+
+// ── SESSION ──
+async function startSession() {
+  const note = document.getElementById('session-note').value.trim();
+  const id = crypto.randomUUID();
+  const now = new Date();
+  const jst = v => new Date(now.getTime() + 9*3600000);
+  const j = jst();
+  const date  = j.toISOString().slice(0,10);
+  const stime = j.toISOString().slice(11,19);
+  await sAppend('sessions!A:E', [[id, date, stime, '', note]]);
+  session = { id, date, startTime: stime, note };
+  exCounts = {};
+  document.getElementById('sbar-date').textContent = date;
+  document.getElementById('sbar-time').textContent = stime.slice(0,5) + '〜';
+  renderBodyParts();
+  showScreen('s-body');
+}
+
+async function doEndSession() {
+  const note = document.getElementById('end-note').value.trim();
+  const now = new Date();
+  const j = new Date(now.getTime() + 9*3600000);
+  const etime = j.toISOString().slice(11,19);
+  const d = await sGet('sessions!A:E');
+  const rows = d.values || [];
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][0] === session.id) {
+      await sPut(`sessions!D${i+1}:E${i+1}`, [[etime, note]]);
+      break;
+    }
+  }
+  session = null;
+  document.getElementById('session-note').value = '';
+  showScreen('s-home');
+}
+
+async function goEndConfirm() {
+  showScreen('s-end');
+  const el = document.getElementById('end-summary');
+  el.innerHTML = '<div class="spin">読み込み中...</div>';
+  document.getElementById('end-note').value = session.note || '';
+  try {
+    const d = await sGet('sets!A:H');
+    const rows = toObjs(d).filter(r => r.session_id === session.id);
+    if (!rows.length) { el.innerHTML = '<div class="muted mt20">記録なし</div>'; return; }
+    const byEx = {};
+    rows.forEach(r => { (byEx[r.exercise_id] = byEx[r.exercise_id]||[]).push(r); });
+    el.innerHTML = Object.entries(byEx).map(([exId, sets]) => {
+      const ex = exercises.find(e => String(e.id) === String(exId));
+      const name = ex ? ex.name : `ID:${exId}`;
+      const type = ex ? ex.input_type : '通常';
+      return `<div class="sum-item">
+        <div class="sum-name">${name}</div>
+        <div class="sum-detail">${sets.map(s => fmtSet(s, type)).join('<br>')}</div>
+      </div>`;
+    }).join('');
+  } catch(e) { el.innerHTML = '<div class="err">読み込みエラー</div>'; }
+}
+
+// ── BODY PARTS ──
+const PARTS = [
+  {id:'胸',   icon:'🏋️', lbl:'胸'},
+  {id:'背中', icon:'💪', lbl:'背中'},
+  {id:'脚',   icon:'🦵', lbl:'脚'},
+  {id:'肩',   icon:'🔝', lbl:'肩'},
+  {id:'腕',   icon:'💪', lbl:'腕'},
+  {id:'体幹', icon:'🎯', lbl:'体幹'},
+  {id:'有酸素',icon:'🏃',lbl:'有酸素'},
+];
+
+function renderBodyParts() {
+  document.getElementById('bp-grid').innerHTML = PARTS.map(p =>
+    `<div class="bp-card" onclick="pickPart('${p.id}')">
+      <div class="icon">${p.icon}</div>
+      <div class="lbl">${p.lbl}</div>
+    </div>`
+  ).join('');
+}
+
+function pickPart(part) {
+  selPart = part;
+  document.getElementById('ex-title').textContent = part;
+  renderExercises();
+  showScreen('s-ex');
+}
+
+// ── EXERCISES ──
+function setSort(mode) {
+  sortMode = mode;
+  document.getElementById('sort-name').className = 'sort-btn' + (mode==='name' ? ' on' : '');
+  document.getElementById('sort-cnt').className  = 'sort-btn' + (mode==='count' ? ' on' : '');
+  renderExercises();
+  if (mode === 'count') loadExCounts();
+}
+
+function renderExercises() {
+  let list = exercises.filter(e => e.body_part === selPart);
+  if (sortMode === 'name') list.sort((a,b) => a.name.localeCompare(b.name,'ja'));
+  else list.sort((a,b) => (exCounts[b.id]||0) - (exCounts[a.id]||0));
+  document.getElementById('ex-list').innerHTML = list.map(e =>
+    `<div class="lst-item" onclick="pickEx('${e.id}')">
+      <span>${e.name}</span>
+      <span class="lst-cnt">${exCounts[e.id] ? exCounts[e.id]+'回' : ''}</span>
+    </div>`
+  ).join('');
+}
+
+async function loadExCounts() {
+  const d = await sGet('sets!C:C');
+  exCounts = {};
+  (d.values||[]).slice(1).forEach(r => { exCounts[r[0]] = (exCounts[r[0]]||0)+1; });
+  renderExercises();
+}
+
+// ── SET INPUT ──
+async function pickEx(exId) {
+  selEx = exercises.find(e => String(e.id) === String(exId));
+  document.getElementById('set-title').textContent = selEx.name;
+  renderSetForm(selEx.input_type);
+  document.getElementById('set-note').value = '';
+  showScreen('s-set');
+
+  const d = await sGet('sets!A:H');
+  const rows = toObjs(d).filter(r => String(r.exercise_id) === String(exId));
+  document.getElementById('prev-val').textContent =
+    rows.length ? fmtSet(rows[rows.length-1], selEx.input_type) : '記録なし';
+}
+
+function renderSetForm(type) {
+  const g = document.getElementById('set-inputs');
+  if (type === '有酸素') {
+    g.innerHTML = `
+      <div class="inp-group">
+        <div class="inp-wrap"><div class="inp-lbl">距離</div>
+          <input id="iw" type="number" class="inp" placeholder="0.0" step="0.1" min="0">
+          <div class="inp-unit">km</div></div>
+        <div class="inp-wrap"><div class="inp-lbl">時間</div>
+          <input id="ir" type="number" class="inp" placeholder="0" min="0">
+          <div class="inp-unit">分</div></div>
+      </div>`;
+  } else if (type === '自重') {
+    g.innerHTML = `
+      <div class="inp-group">
+        <div class="inp-wrap"><div class="inp-lbl">回数</div>
+          <input id="ir" type="number" class="inp" placeholder="0" min="0">
+          <div class="inp-unit">回</div></div>
+        <div class="inp-wrap"><div class="inp-lbl">セット数</div>
+          <input id="is" type="number" class="inp" value="1" min="1">
+          <div class="inp-unit">セット</div></div>
+      </div>`;
+  } else {
+    const wlbl = type === '補助重量' ? '補助重量' : '重量';
+    g.innerHTML = `
+      <div class="inp-group">
+        <div class="inp-wrap"><div class="inp-lbl">${wlbl}</div>
+          <input id="iw" type="number" class="inp" placeholder="0" step="0.5" min="0">
+          <div class="inp-unit">kg</div></div>
+        <div class="inp-wrap"><div class="inp-lbl">回数</div>
+          <input id="ir" type="number" class="inp" placeholder="0" min="0">
+          <div class="inp-unit">回</div></div>
+        <div class="inp-wrap"><div class="inp-lbl">セット数</div>
+          <input id="is" type="number" class="inp" value="1" min="1">
+          <div class="inp-unit">セット</div></div>
+      </div>`;
+  }
+}
+
+async function doSaveSet() {
+  const type  = selEx.input_type;
+  const weight = document.getElementById('iw')?.value ?? '';
+  const reps   = document.getElementById('ir')?.value ?? '';
+  const sets   = document.getElementById('is')?.value ?? '1';
+  const note   = document.getElementById('set-note').value.trim();
+
+  const d = await sGet('sets!A:H');
+  const allRows = d.values || [];
+  const hdrs    = allRows[0] || [];
+  let updated = false;
+
+  for (let i = allRows.length - 1; i >= 1; i--) {
+    const o = Object.fromEntries(hdrs.map((h,j) => [h, allRows[i][j]??'']));
+    if (o.session_id  === session.id &&
+        String(o.exercise_id) === String(selEx.id) &&
+        String(o.weight) === String(weight) &&
+        String(o.reps)   === String(reps)) {
+      await sPut(`sets!F${i+1}:H${i+1}`, [[sets, note, new Date().toISOString()]]);
+      updated = true; break;
+    }
+  }
+
+  if (!updated) {
+    await sAppend('sets!A:H', [[
+      crypto.randomUUID(), session.id, selEx.id,
+      weight, reps, sets, note, new Date().toISOString()
+    ]]);
+  }
+
+  exCounts[selEx.id] = (exCounts[selEx.id]||0) + 1;
+  document.getElementById('popup').classList.add('on');
+}
+
+function popContinue() {
+  document.getElementById('popup').classList.remove('on');
+  ['iw','ir'].forEach(id => { const e=document.getElementById(id); if(e) e.value=''; });
+  const s = document.getElementById('is'); if(s) s.value='1';
+  document.getElementById('set-note').value = '';
+}
+
+// ── FORMAT ──
+function fmtSet(r, type) {
+  if (type==='有酸素') return `${r.weight}km ${r.reps}分`;
+  if (type==='自重')   return `${r.reps}回 × ${r.sets}セット`;
+  if (type==='補助重量') return `補助${r.weight}kg × ${r.reps}回 × ${r.sets}セット`;
+  return `${r.weight}kg × ${r.reps}回 × ${r.sets}セット`;
+}
+
+// ── NAV ──
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.getElementById('popup').classList.remove('on');
+}
+</script>
+</body>
+</html>
