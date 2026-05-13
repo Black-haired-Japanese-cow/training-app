@@ -376,10 +376,11 @@ function renderExercises() {
   else list.sort((a,b) => (exCounts[b.id]||0) - (exCounts[a.id]||0));
   document.getElementById('ex-list').innerHTML = list.map(e => {
     const max = exMaxWeight[e.id];
-    const maxLabel = max ? `MAX ${max}kg` : '';
+    const cnt = exCounts[e.id];
+    const sub = [max ? `MAX ${max}kg` : '', cnt ? `${cnt}回` : ''].filter(Boolean).join(' / ');
     return `<div class="lst-item" onclick="pickEx('${e.id}')">
       <span>${e.name}</span>
-      <span class="lst-cnt">${maxLabel}</span>
+      <span class="lst-cnt">${sub}</span>
     </div>`;
   }).join('');
 }
