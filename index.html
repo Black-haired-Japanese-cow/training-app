@@ -398,8 +398,18 @@ async function pickEx(exId) {
 
   const d = await sGet('sets!A:H');
   const rows = toObjs(d).filter(r => String(r.exercise_id) === String(exId));
-  document.getElementById('prev-val').textContent =
-    rows.length ? fmtSet(rows[rows.length-1], selEx.input_type) : '記録なし';
+  if (rows.length) {
+    const last = rows[rows.length-1];
+    document.getElementById('prev-val').textContent = fmtSet(last, selEx.input_type);
+    const iw = document.getElementById('iw');
+    const ir = document.getElementById('ir');
+    const is = document.getElementById('is');
+    if (iw) iw.value = last.weight || '';
+    if (ir) ir.value = last.reps   || '';
+    if (is) is.value = last.sets   || '1';
+  } else {
+    document.getElementById('prev-val').textContent = '記録なし';
+  }
 }
 
 function renderSetForm(type) {
