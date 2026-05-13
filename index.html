@@ -191,7 +191,7 @@ const API     = `https://sheets.googleapis.com/v4/spreadsheets/${SS_ID}`;
 
 // ── STATE ──
 let token = null, tokenExp = 0, tokenClient = null;
-let exercises = [], exCounts = {};
+let exercises = [], exCounts = {}, exMaxWeight = {};
 let session = null;       // { id, date, startTime }
 let selPart = null, selEx = null;
 let sortMode = 'name';
@@ -358,6 +358,7 @@ function pickPart(part) {
   document.getElementById('ex-title').textContent = part;
   renderExercises();
   showScreen('s-ex');
+  if (Object.keys(exMaxWeight).length === 0) loadExStats();
 }
 
 // ── EXERCISES ──
@@ -366,25 +367,33 @@ function setSort(mode) {
   document.getElementById('sort-name').className = 'sort-btn' + (mode==='name' ? ' on' : '');
   document.getElementById('sort-cnt').className  = 'sort-btn' + (mode==='count' ? ' on' : '');
   renderExercises();
-  if (mode === 'count') loadExCounts();
+  if (mode === 'count' && Object.keys(exCounts).length === 0) loadExStats();
 }
 
 function renderExercises() {
   let list = exercises.filter(e => e.body_part === selPart);
   if (sortMode === 'name') list.sort((a,b) => a.name.localeCompare(b.name,'ja'));
   else list.sort((a,b) => (exCounts[b.id]||0) - (exCounts[a.id]||0));
-  document.getElementById('ex-list').innerHTML = list.map(e =>
-    `<div class="lst-item" onclick="pickEx('${e.id}')">
+  document.getElementById('ex-list').innerHTML = list.map(e => {
+    const max = exMaxWeight[e.id];
+    const maxLabel = max ? `MAX ${max}kg` : '';
+    return `<div class="lst-item" onclick="pickEx('${e.id}')">
       <span>${e.name}</span>
-      <span class="lst-cnt">${exCounts[e.id] ? exCounts[e.id]+'回' : ''}</span>
-    </div>`
-  ).join('');
+      <span class="lst-cnt">${maxLabel}</span>
+    </div>`;
+  }).join('');
 }
 
-async function loadExCounts() {
-  const d = await sGet('sets!C:C');
-  exCounts = {};
-  (d.values||[]).slice(1).forEach(r => { exCounts[r[0]] = (exCounts[r[0]]||0)+1; });
+async function loadExStats() {
+  const d = await sGet('sets!C:D');
+  exCounts = {}; exMaxWeight = {};
+  (d.values||[]).slice(1).forEach(r => {
+    const id = r[0], w = parseFloat(r[1]);
+    exCounts[id] = (exCounts[id]||0) + 1;
+    if (!isNaN(w) && w > 0) {
+      exMaxWeight[id] = Math.max(exMaxWeight[id]||0, w);
+    }
+  });
   renderExercises();
 }
 
