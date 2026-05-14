@@ -622,7 +622,7 @@ async function showHistDetail(idx) {
       obj._sheetIdx = i + 1;
       return obj;
     });
-    histDetailSets = allRows.filter(r => r.session_id === s.id);
+    histDetailSets = allRows.filter(r => r.id && r.session_id === s.id);
     histDetailSets.forEach((r, i) => {
       r._detailIdx = i;
       const ex = exercises.find(e => String(e.id) === String(r.exercise_id));
@@ -713,20 +713,7 @@ async function doSaveEditSet() {
 async function doDeleteSet(idx) {
   if (!confirm('このセットを削除しますか？')) return;
   const set = histDetailSets[idx];
-  if (SETS_GID === null || SETS_GID === undefined) {
-    alert('シート情報が取得できていません。再読み込みしてください。'); return;
-  }
-  await ensureToken();
-  const res = await fetch(`${API}:batchUpdate`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ requests: [{ deleteDimension: {
-      range: { sheetId: SETS_GID, dimension: 'ROWS',
-        startIndex: set._sheetIdx, endIndex: set._sheetIdx + 1 }
-    }}]})
-  });
-  const result = await res.json();
-  if (result.error) { alert('削除エラー: ' + result.error.message); return; }
+  await sPut(`sets!A${set._sheetRow}:H${set._sheetRow}`, [['','','','','','','','']]);
   await showHistDetail(currentHistIdx);
 }
 
