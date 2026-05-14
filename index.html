@@ -232,7 +232,7 @@ let exercises = [], exCounts = {}, exMaxWeight = {};
 let session = null;
 let selPart = null, selEx = null;
 let sortMode = 'name';
-let SETS_GID = null;
+let SETS_GID = null, SESSIONS_GID = null;
 let editingSet = null, currentHistIdx = null, histDetailSets = [];
 
 // ── AUTH ──
@@ -320,11 +320,14 @@ async function onSignedIn() {
 }
 
 async function loadSheetsMetadata() {
+  await ensureToken();
   const r = await fetch(`${API}?fields=sheets.properties`,
     { headers: { Authorization: `Bearer ${token}` } });
   const data = await r.json();
-  const s = data.sheets?.find(s => s.properties.title === 'sets');
-  if (s) SETS_GID = s.properties.sheetId;
+  data.sheets?.forEach(s => {
+    if (s.properties.title === 'sets')     SETS_GID     = s.properties.sheetId;
+    if (s.properties.title === 'sessions') SESSIONS_GID = s.properties.sheetId;
+  });
 }
 
 // ── SESSION ──
@@ -710,21 +713,33 @@ async function doSaveEditSet() {
   await showHistDetail(currentHistIdx);
 }
 
-async function doDeleteSet(idx) {
-  const set = histDetailSets[idx];
-  if (!confirm(`削除確認\nSETS_GID: ${SETS_GID}\n行インデックス(0始まり): ${set._sheetIdx}\nシート行番号(1始まり): ${set._sheetRow}`)) return;
+async function deleteSheetRow(gid, sheetIdx) {
   await ensureToken();
   const res = await fetch(`${API}:batchUpdate`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ requests: [{ deleteDimension: {
-      range: { sheetId: SETS_GID, dimension: 'ROWS',
-        startIndex: set._sheetIdx, endIndex: set._sheetIdx + 1 }
+      range: { sheetId: gid, dimension: 'ROWS',
+        startIndex: sheetIdx, endIndex: sheetIdx + 1 }
     }}]})
   });
   const result = await res.json();
-  if (result.error) {
-    alert('削除エラー: ' + JSON.stringify(result.error));
+  if (result.error) { alert('削除エラー: ' + result.error.message); return false; }
+  return true;
+}
+
+async function doDeleteSet(idx) {
+  if (!confirm('このセットを削除しますか？')) return;
+  const set = histDetailSets[idx];
+  const ok = await deleteSheetRow(SETS_GID, set._sheetIdx);
+  if (!ok) return;
+
+  // セット削除後にそのセッションのセットが0件になった場合はセッション行も削除
+  const remaining = histDetailSets.filter((r, i) => i !== idx && r.id);
+  if (remaining.length === 0 && SESSIONS_GID !== null) {
+    const s = histSessions[currentHistIdx];
+    await deleteSheetRow(SESSIONS_GID, s._sheetRow - 1); // 0-based
+    await showHistory();
     return;
   }
   await showHistDetail(currentHistIdx);
