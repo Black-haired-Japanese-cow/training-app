@@ -299,12 +299,10 @@ async function startSession() {
   const note = document.getElementById('session-note').value.trim();
   const id = crypto.randomUUID();
   const now = new Date();
-  const jst = v => new Date(now.getTime() + 9*3600000);
-  const j = jst();
+  const j = new Date(now.getTime() + 9*3600000);
   const date  = j.toISOString().slice(0,10);
   const stime = j.toISOString().slice(11,19);
-  await sAppend('sessions!A:E', [[id, date, stime, '', note]]);
-  session = { id, date, startTime: stime, note };
+  session = { id, date, startTime: stime, note, persisted: false };
   exCounts = {};
   document.getElementById('sbar-date').textContent = date;
   document.getElementById('sbar-time').textContent = stime.slice(0,5) + '〜';
@@ -317,12 +315,14 @@ async function doEndSession() {
   const now = new Date();
   const j = new Date(now.getTime() + 9*3600000);
   const etime = j.toISOString().slice(11,19);
-  const d = await sGet('sessions!A:E');
-  const rows = d.values || [];
-  for (let i = 1; i < rows.length; i++) {
-    if (rows[i][0] === session.id) {
-      await sPut(`sessions!D${i+1}:E${i+1}`, [[etime, note]]);
-      break;
+  if (session.persisted) {
+    const d = await sGet('sessions!A:E');
+    const rows = d.values || [];
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][0] === session.id) {
+        await sPut(`sessions!D${i+1}:E${i+1}`, [[etime, note]]);
+        break;
+      }
     }
   }
   session = null;
@@ -505,6 +505,10 @@ async function doSaveSet() {
   }
 
   if (!updated) {
+    if (!session.persisted) {
+      await sAppend('sessions!A:E', [[session.id, session.date, session.startTime, '', session.note]]);
+      session.persisted = true;
+    }
     await sAppend('sets!A:H', [[
       crypto.randomUUID(), session.id, selEx.id,
       weight, reps, sets, note, new Date().toISOString()
