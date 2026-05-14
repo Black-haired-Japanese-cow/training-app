@@ -539,7 +539,9 @@ async function showHistory() {
   el.innerHTML = '<div class="spin">読み込み中...</div>';
   try {
     const d = await sGet('sessions!A:E');
-    histSessions = toObjs(d).filter(r => r.id).reverse();
+    histSessions = toObjs(d)
+      .filter(r => r.id)
+      .sort((a, b) => (b.date + b.start_time).localeCompare(a.date + a.start_time));
     if (!histSessions.length) { el.innerHTML = '<div class="muted">履歴なし</div>'; return; }
     el.innerHTML = histSessions.map((s, i) => {
       const time = s.end_time
