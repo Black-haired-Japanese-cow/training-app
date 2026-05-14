@@ -193,6 +193,17 @@
   <div id="hist-detail-body"></div>
 </div>
 
+<!-- EDIT SET OVERLAY -->
+<div class="overlay" id="edit-overlay">
+  <div class="popup">
+    <h3>セットを編集</h3>
+    <div id="edit-inputs"></div>
+    <textarea id="edit-note" class="inp" placeholder="セットメモ（任意）"></textarea>
+    <button class="btn btn-primary mt8" onclick="doSaveEditSet()">保存</button>
+    <button class="btn btn-ghost" onclick="document.getElementById('edit-overlay').classList.remove('on')">キャンセル</button>
+  </div>
+</div>
+
 <!-- SAVE POPUP -->
 <div class="overlay" id="popup">
   <div class="popup">
@@ -214,9 +225,11 @@ const API     = `https://sheets.googleapis.com/v4/spreadsheets/${SS_ID}`;
 // ── STATE ──
 let token = null, tokenExp = 0, tokenClient = null;
 let exercises = [], exCounts = {}, exMaxWeight = {};
-let session = null;       // { id, date, startTime }
+let session = null;
 let selPart = null, selEx = null;
 let sortMode = 'name';
+let SETS_GID = null;
+let editingSet = null, currentHistIdx = null, histDetailSets = [];
 
 // ── AUTH ──
 function initAuth() {
@@ -294,12 +307,20 @@ async function onSignedIn() {
   setTodayDate();
   document.getElementById('home-msg').textContent = '種目データを読み込み中...';
   try {
-    const d = await sGet('exercises!A:E');
-    exercises = toObjs(d);
+    const [exData] = await Promise.all([sGet('exercises!A:E'), loadSheetsMetadata()]);
+    exercises = toObjs(exData);
     document.getElementById('home-msg').textContent = `種目 ${exercises.length} 件 読み込み完了`;
   } catch(e) {
     document.getElementById('home-msg').textContent = 'データ読み込みエラー';
   }
+}
+
+async function loadSheetsMetadata() {
+  const r = await fetch(`${API}?fields=sheets.properties`,
+    { headers: { Authorization: `Bearer ${token}` } });
+  const data = await r.json();
+  const s = data.sheets?.find(s => s.properties.title === 'sets');
+  if (s) SETS_GID = s.properties.sheetId;
 }
 
 // ── SESSION ──
@@ -572,6 +593,7 @@ async function showHistory() {
 }
 
 async function showHistDetail(idx) {
+  currentHistIdx = idx;
   const s = histSessions[idx];
   const time = s.end_time
     ? `${s.start_time.slice(0,5)}〜${s.end_time.slice(0,5)}`
@@ -583,20 +605,116 @@ async function showHistDetail(idx) {
   el.innerHTML = '<div class="spin">読み込み中...</div>';
   try {
     const d = await sGet('sets!A:H');
-    const rows = toObjs(d).filter(r => r.session_id === s.id);
-    if (!rows.length) { el.innerHTML = '<div class="muted">記録なし</div>'; return; }
+    const allValues = d.values || [];
+    const headers = allValues[0] || [];
+    const allRows = allValues.slice(1).map((row, i) => {
+      const obj = Object.fromEntries(headers.map((h, j) => [h, row[j] ?? '']));
+      obj._sheetRow = i + 2;
+      obj._sheetIdx = i + 1;
+      return obj;
+    });
+    histDetailSets = allRows.filter(r => r.session_id === s.id);
+    histDetailSets.forEach((r, i) => {
+      r._detailIdx = i;
+      const ex = exercises.find(e => String(e.id) === String(r.exercise_id));
+      r._type = ex ? ex.input_type : '通常';
+    });
+    if (!histDetailSets.length) { el.innerHTML = '<div class="muted">記録なし</div>'; return; }
     const byEx = {};
-    rows.forEach(r => { (byEx[r.exercise_id] = byEx[r.exercise_id]||[]).push(r); });
-    el.innerHTML = Object.entries(byEx).map(([exId, sets]) => {
-      const ex = exercises.find(e => String(e.id) === String(exId));
-      const name = ex ? ex.name : `ID:${exId}`;
-      const type = ex ? ex.input_type : '通常';
-      return `<div class="sum-item">
+    histDetailSets.forEach(r => {
+      if (!byEx[r.exercise_id]) {
+        const ex = exercises.find(e => String(e.id) === String(r.exercise_id));
+        byEx[r.exercise_id] = { name: ex ? ex.name : `ID:${r.exercise_id}`, type: r._type, sets: [] };
+      }
+      byEx[r.exercise_id].sets.push(r);
+    });
+    el.innerHTML = Object.values(byEx).map(({ name, type, sets }) =>
+      `<div class="sum-item">
         <div class="sum-name">${name}</div>
-        <div class="sum-detail">${sets.map((r,i) => `${i+1}. ${fmtSet(r, type)}`).join('<br>')}</div>
-      </div>`;
-    }).join('');
+        ${sets.map((r, i) => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;${i < sets.length-1 ? 'border-bottom:1px solid #252540' : ''}">
+            <div style="font-size:.85rem;color:#aaa">${i+1}. ${fmtSet(r, type)}</div>
+            <div style="display:flex;gap:6px;flex-shrink:0">
+              <button onclick="startEditSet(${r._detailIdx})"
+                style="background:none;border:1px solid #3a3a5a;border-radius:6px;color:#aaa;padding:3px 8px;font-size:.75rem;cursor:pointer">編集</button>
+              <button onclick="doDeleteSet(${r._detailIdx})"
+                style="background:none;border:1px solid #3a3a5a;border-radius:6px;color:#e94560;padding:3px 8px;font-size:.75rem;cursor:pointer">削除</button>
+            </div>
+          </div>`).join('')}
+      </div>`
+    ).join('');
   } catch(e) { el.innerHTML = '<div class="err">読み込みエラー</div>'; }
+}
+
+function startEditSet(idx) {
+  editingSet = histDetailSets[idx];
+  renderEditForm(editingSet._type);
+  document.getElementById('edit-note').value = editingSet.note || '';
+  document.getElementById('edit-overlay').classList.add('on');
+}
+
+function renderEditForm(type) {
+  const r = editingSet;
+  const g = document.getElementById('edit-inputs');
+  if (type === '有酸素') {
+    g.innerHTML = `<div class="inp-group">
+      <div class="inp-wrap"><div class="inp-lbl">距離</div>
+        <input id="eiw" type="number" class="inp" value="${r.weight}" step="0.1" min="0">
+        <div class="inp-unit">km</div></div>
+      <div class="inp-wrap"><div class="inp-lbl">時間</div>
+        <input id="eir" type="number" class="inp" value="${r.reps}" min="0">
+        <div class="inp-unit">分</div></div>
+    </div>`;
+  } else if (type === '自重') {
+    g.innerHTML = `<div class="inp-group">
+      <div class="inp-wrap"><div class="inp-lbl">回数</div>
+        <input id="eir" type="number" class="inp" value="${r.reps}" min="0">
+        <div class="inp-unit">回</div></div>
+      <div class="inp-wrap"><div class="inp-lbl">セット数</div>
+        <input id="eis" type="number" class="inp" value="${r.sets||1}" min="1">
+        <div class="inp-unit">セット</div></div>
+    </div>`;
+  } else {
+    const wlbl = type === '補助重量' ? '補助重量' : '重量';
+    g.innerHTML = `<div class="inp-group">
+      <div class="inp-wrap"><div class="inp-lbl">${wlbl}</div>
+        <input id="eiw" type="number" class="inp" value="${r.weight}" step="0.5" min="0">
+        <div class="inp-unit">kg</div></div>
+      <div class="inp-wrap"><div class="inp-lbl">回数</div>
+        <input id="eir" type="number" class="inp" value="${r.reps}" min="0">
+        <div class="inp-unit">回</div></div>
+      <div class="inp-wrap"><div class="inp-lbl">セット数</div>
+        <input id="eis" type="number" class="inp" value="${r.sets||1}" min="1">
+        <div class="inp-unit">セット</div></div>
+    </div>`;
+  }
+}
+
+async function doSaveEditSet() {
+  const weight = document.getElementById('eiw')?.value ?? '';
+  const reps   = document.getElementById('eir')?.value ?? '';
+  const sets   = document.getElementById('eis')?.value ?? '1';
+  const note   = document.getElementById('edit-note').value.trim();
+  await sPut(`sets!D${editingSet._sheetRow}:H${editingSet._sheetRow}`,
+    [[weight, reps, sets, note, new Date().toISOString()]]);
+  document.getElementById('edit-overlay').classList.remove('on');
+  await showHistDetail(currentHistIdx);
+}
+
+async function doDeleteSet(idx) {
+  if (!confirm('このセットを削除しますか？')) return;
+  const set = histDetailSets[idx];
+  if (SETS_GID === null) { alert('シート情報が取得できていません。再読み込みしてください。'); return; }
+  await ensureToken();
+  await fetch(`${API}:batchUpdate`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ requests: [{ deleteDimension: {
+      range: { sheetId: SETS_GID, dimension: 'ROWS',
+        startIndex: set._sheetIdx, endIndex: set._sheetIdx + 1 }
+    }}]})
+  });
+  await showHistDetail(currentHistIdx);
 }
 
 // ── NAV ──
