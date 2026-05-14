@@ -108,7 +108,9 @@
   <div class="hdr"><h1>💪 筋トレ記録</h1></div>
   <div id="home-msg" class="muted"></div>
   <div class="spacer"></div>
-  <div class="prev-label muted mt20" style="margin-bottom:8px;text-align:left">セッションメモ（任意）</div>
+  <div class="prev-label muted mt20" style="margin-bottom:8px;text-align:left">日付</div>
+  <input id="session-date" type="date" class="inp" style="font-size:1rem;padding:14px 12px">
+  <div class="prev-label muted mt16" style="margin-bottom:8px;text-align:left">セッションメモ（任意）</div>
   <textarea id="session-note" class="inp" placeholder="今日のコンディションなど"></textarea>
   <div class="mt16">
     <button class="btn btn-primary" onclick="startSession()">セッション開始</button>
@@ -282,8 +284,14 @@ function toObjs(d) {
 }
 
 // ── INIT ──
+function setTodayDate() {
+  const j = new Date(Date.now() + 9*3600000);
+  document.getElementById('session-date').value = j.toISOString().slice(0,10);
+}
+
 async function onSignedIn() {
   showScreen('s-home');
+  setTodayDate();
   document.getElementById('home-msg').textContent = '種目データを読み込み中...';
   try {
     const d = await sGet('exercises!A:E');
@@ -300,7 +308,7 @@ async function startSession() {
   const id = crypto.randomUUID();
   const now = new Date();
   const j = new Date(now.getTime() + 9*3600000);
-  const date  = j.toISOString().slice(0,10);
+  const date  = document.getElementById('session-date').value || j.toISOString().slice(0,10);
   const stime = j.toISOString().slice(11,19);
   session = { id, date, startTime: stime, note, persisted: false };
   exCounts = {};
@@ -327,6 +335,7 @@ async function doEndSession() {
   }
   session = null;
   document.getElementById('session-note').value = '';
+  setTodayDate();
   showScreen('s-home');
 }
 
