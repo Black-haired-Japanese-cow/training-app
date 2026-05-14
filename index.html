@@ -189,6 +189,10 @@
     <button class="back" onclick="showScreen('s-history')">←</button>
     <h1 id="hist-detail-title"></h1>
   </div>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px">
+    <input id="hist-date-input" type="date" class="inp" style="font-size:.9rem;padding:10px 12px;flex:1">
+    <button onclick="updateSessionDate()" class="btn btn-outline" style="width:auto;padding:10px 16px;font-size:.85rem;flex-shrink:0">日付更新</button>
+  </div>
   <div id="hist-detail-meta" class="muted" style="margin-bottom:14px"></div>
   <div id="hist-detail-body"></div>
 </div>
@@ -573,8 +577,12 @@ async function showHistory() {
   el.innerHTML = '<div class="spin">読み込み中...</div>';
   try {
     const d = await sGet('sessions!A:E');
-    histSessions = toObjs(d)
-      .filter(r => r.id)
+    const sv = d.values || [], sh = sv[0] || [];
+    histSessions = sv.slice(1).map((row, i) => {
+      const obj = Object.fromEntries(sh.map((h, j) => [h, row[j] ?? '']));
+      obj._sheetRow = i + 2;
+      return obj;
+    }).filter(r => r.id)
       .sort((a, b) => (b.date + b.start_time).localeCompare(a.date + a.start_time));
     if (!histSessions.length) { el.innerHTML = '<div class="muted">履歴なし</div>'; return; }
     el.innerHTML = histSessions.map((s, i) => {
@@ -599,6 +607,7 @@ async function showHistDetail(idx) {
     ? `${s.start_time.slice(0,5)}〜${s.end_time.slice(0,5)}`
     : s.start_time.slice(0,5) + '〜';
   document.getElementById('hist-detail-title').textContent = s.date;
+  document.getElementById('hist-date-input').value = s.date;
   document.getElementById('hist-detail-meta').textContent = time + (s.note ? ' · ' + s.note : '');
   showScreen('s-hist-detail');
   const el = document.getElementById('hist-detail-body');
@@ -704,9 +713,11 @@ async function doSaveEditSet() {
 async function doDeleteSet(idx) {
   if (!confirm('このセットを削除しますか？')) return;
   const set = histDetailSets[idx];
-  if (SETS_GID === null) { alert('シート情報が取得できていません。再読み込みしてください。'); return; }
+  if (SETS_GID === null || SETS_GID === undefined) {
+    alert('シート情報が取得できていません。再読み込みしてください。'); return;
+  }
   await ensureToken();
-  await fetch(`${API}:batchUpdate`, {
+  const res = await fetch(`${API}:batchUpdate`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ requests: [{ deleteDimension: {
@@ -714,7 +725,18 @@ async function doDeleteSet(idx) {
         startIndex: set._sheetIdx, endIndex: set._sheetIdx + 1 }
     }}]})
   });
+  const result = await res.json();
+  if (result.error) { alert('削除エラー: ' + result.error.message); return; }
   await showHistDetail(currentHistIdx);
+}
+
+async function updateSessionDate() {
+  const s = histSessions[currentHistIdx];
+  const newDate = document.getElementById('hist-date-input').value;
+  if (!newDate || newDate === s.date) return;
+  await sPut(`sessions!B${s._sheetRow}`, [[newDate]]);
+  s.date = newDate;
+  document.getElementById('hist-detail-title').textContent = newDate;
 }
 
 // ── NAV ──
