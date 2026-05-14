@@ -736,9 +736,12 @@ async function doDeleteSet(idx) {
 
   // セット削除後にそのセッションのセットが0件になった場合はセッション行も削除
   const remaining = histDetailSets.filter((r, i) => i !== idx && r.id);
-  if (remaining.length === 0 && SESSIONS_GID !== null) {
+  if (remaining.length === 0) {
     const s = histSessions[currentHistIdx];
-    await deleteSheetRow(SESSIONS_GID, s._sheetRow - 1); // 0-based
+    alert(`DEBUG: SESSIONS_GID=${SESSIONS_GID}, session_sheetRow=${s._sheetRow}, 0-based=${s._sheetRow - 1}`);
+    if (SESSIONS_GID !== null && SESSIONS_GID !== undefined) {
+      await deleteSheetRow(SESSIONS_GID, s._sheetRow - 1);
+    }
     await showHistory();
     return;
   }
