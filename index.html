@@ -738,7 +738,6 @@ async function doDeleteSet(idx) {
   const remaining = histDetailSets.filter((r, i) => i !== idx && r.id);
   if (remaining.length === 0) {
     const s = histSessions[currentHistIdx];
-    alert(`DEBUG: SESSIONS_GID=${SESSIONS_GID}, session_sheetRow=${s._sheetRow}, 0-based=${s._sheetRow - 1}`);
     if (SESSIONS_GID !== null && SESSIONS_GID !== undefined) {
       await deleteSheetRow(SESSIONS_GID, s._sheetRow - 1);
     }
