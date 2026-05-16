@@ -115,12 +115,11 @@
 </div>
 
 <!-- BODY PART -->
-<div id="s-body" class="screen">
+<div id="s-body" class="screen" style="padding-bottom:0">
   <div class="hdr"><h1>部位を選択</h1></div>
   <div id="sbar-body" class="sbar"><span id="sbar-date"></span><span id="sbar-time"></span></div>
-  <div class="bp-grid" id="bp-grid"></div>
-  <div class="spacer"></div>
-  <div class="mt16">
+  <div class="bp-grid" id="bp-grid" style="overflow-y:auto;flex:1"></div>
+  <div style="padding:16px 0">
     <button class="btn btn-outline" onclick="goEndConfirm()">セッション終了</button>
   </div>
 </div>
