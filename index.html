@@ -132,8 +132,8 @@
     <h1 id="ex-title">種目</h1>
   </div>
   <div class="sort-row">
-    <button class="sort-btn on" id="sort-name" onclick="setSort('name')">50音順</button>
-    <button class="sort-btn" id="sort-cnt" onclick="setSort('count')">実施回数順</button>
+    <button class="sort-btn" id="sort-name" onclick="setSort('name')">50音順</button>
+    <button class="sort-btn on" id="sort-cnt" onclick="setSort('count')">実施回数順</button>
   </div>
   <div class="lst" id="ex-list"></div>
 </div>
@@ -229,7 +229,7 @@ let token = null, tokenExp = 0, tokenClient = null;
 let exercises = [], exCounts = {}, exMaxWeight = {};
 let session = null;
 let selPart = null, selEx = null;
-let sortMode = 'name';
+let sortMode = 'count';
 let SETS_GID = null, SESSIONS_GID = null;
 let editingSet = null, currentHistIdx = null, histDetailSets = [];
 
