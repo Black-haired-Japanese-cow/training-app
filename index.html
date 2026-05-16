@@ -108,10 +108,6 @@
   <div class="hdr"><h1>💪 筋トレ記録</h1></div>
   <div id="home-msg" class="muted"></div>
   <div class="spacer"></div>
-  <div class="prev-label muted mt20" style="margin-bottom:8px;text-align:left">日付</div>
-  <input id="session-date" type="date" class="inp" style="font-size:1rem;padding:14px 12px">
-  <div class="prev-label muted mt16" style="margin-bottom:8px;text-align:left">セッションメモ（任意）</div>
-  <textarea id="session-note" class="inp" placeholder="今日のコンディションなど"></textarea>
   <div class="mt16">
     <button class="btn btn-primary" onclick="startSession()">セッション開始</button>
     <button class="btn btn-ghost mt8" onclick="showHistory()">履歴を見る</button>
@@ -167,6 +163,8 @@
   </div>
   <div id="end-summary"></div>
   <div class="spacer"></div>
+  <div class="prev-label muted" style="margin-bottom:8px;text-align:left">日付</div>
+  <input id="end-date" type="date" class="inp" style="font-size:1rem;padding:14px 12px;margin-bottom:16px">
   <textarea id="end-note" class="inp" placeholder="セッションメモ（任意）"></textarea>
   <div class="mt16">
     <button class="btn btn-primary" onclick="doEndSession()">終了して保存</button>
@@ -301,14 +299,8 @@ function toObjs(d) {
 }
 
 // ── INIT ──
-function setTodayDate() {
-  const j = new Date(Date.now() + 9*3600000);
-  document.getElementById('session-date').value = j.toISOString().slice(0,10);
-}
-
 async function onSignedIn() {
   showScreen('s-home');
-  setTodayDate();
   document.getElementById('home-msg').textContent = '種目データを読み込み中...';
   try {
     const [exData] = await Promise.all([sGet('exercises!A:E'), loadSheetsMetadata()]);
@@ -331,23 +323,24 @@ async function loadSheetsMetadata() {
 }
 
 // ── SESSION ──
-async function startSession() {
-  const note = document.getElementById('session-note').value.trim();
+function startSession() {
   const id = crypto.randomUUID();
   const now = new Date();
   const j = new Date(now.getTime() + 9*3600000);
-  const date  = document.getElementById('session-date').value || j.toISOString().slice(0,10);
+  const date = j.toISOString().slice(0,10);
   const stime = j.toISOString().slice(11,19);
-  session = { id, date, startTime: stime, note, persisted: false };
+  session = { id, date, startTime: stime, note: '', persisted: false };
   exCounts = {};
   document.getElementById('sbar-date').textContent = date;
   document.getElementById('sbar-time').textContent = stime.slice(0,5) + '〜';
+  document.getElementById('end-date').value = date;
   renderBodyParts();
   showScreen('s-body');
 }
 
 async function doEndSession() {
   const note = document.getElementById('end-note').value.trim();
+  const date = document.getElementById('end-date').value || session.date;
   const now = new Date();
   const j = new Date(now.getTime() + 9*3600000);
   const etime = j.toISOString().slice(11,19);
@@ -357,13 +350,12 @@ async function doEndSession() {
     for (let i = 1; i < rows.length; i++) {
       if (rows[i][0] === session.id) {
         await sPut(`sessions!D${i+1}:E${i+1}`, [[etime, note]]);
+        if (date !== session.date) await sPut(`sessions!B${i+1}`, [[date]]);
         break;
       }
     }
   }
   session = null;
-  document.getElementById('session-note').value = '';
-  setTodayDate();
   showScreen('s-home');
 }
 
